@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# All the filenames for temporary files
+tmp_processed_filename="processed_file$$"
+tmp_input_filename="input_file$$"
+tmp_results_filename="results_file$$"
+
+remove_tmp_files () {
+    if [[ -f $tmp_processed_filename ]]
+    then
+        rm $tmp_processed_filename
+    fi
+
+    if [[ -f $tmp_input_filename ]]
+    then
+        rm $tmp_input_filename
+    fi
+
+    if [[ -f $tmp_results_filename ]]
+    then
+        rm $tmp_results_filename
+    fi
+}
+
+trap "remove_tmp_files; exit 1" INT HUP TERM
+
+usage_msg="./stats {-rows|-cols} [file]"
+
+# Exit if incorrect # of args
+if [[ $# -lt 1 ]] || [[ $# -gt 2 ]]
+then
+    echo $usage_msg >&2
+    exit 1
+fi
+
+# Find out which mode the input is in, rows or cols
+input_mode=0
+
+if [[ $1 == -r* ]]
+then
+    input_mode="r"
+elif [[ $1 == -c* ]]
+then
+    input_mode="c"
+else
+    echo $usage_msg >&2
+    exit 1
+fi
+
+# Find out if file is from stdin or filename, if from stdin create temp file
+input_filename=$tmp_input_filename
+
+if [[ -z $2 ]]
+then
+    cat > $input_filename
+else
+    input_filename=$2
+fi
+
+# Exit if input file is NOT readable
+if [[ ! -r $input_filename ]]
+then
+    echo "./stats: cannot read $input_filename" >&2
+    exit 1
+fi
+
+# Create version of input file in rows mode if in cols mode
+processed_filename=$input_filename
+
+if [[ $input_mode == "c" ]]
+then
+    processed_filename=$tmp_processed_filename
+    touch $processed_filename
+    i=1
+
+    read line < $input_filename
+    
+    for num in $line
+    do
+        cut -f $i $input_filename | tr "\n" "\t" >> $processed_filename
+        echo >> $processed_filename
+        ((i++))
+    done
+fi
+
+# Calculate sum and median of each row/col and write it to temp results file
+results_filename=$tmp_results_filename
+touch $results_filename
+
+while read -r line
+do
+    sum=0
+    count=0
+
+    for num in $line
+    do
+        sum=$((sum + num))
+        ((count++))
+    done
+
+    avg=$(((sum + (count / 2)) / count))
+    med_i=$(((count / 2) + 1))
+    median=$(echo $line | tr " " "\n" | sort -n | head -n $med_i | tail -n 1)
+    echo -e "$avg\t$median" >> $results_filename
+done < $processed_filename
+
+# Prints the results to the user
+if [[ $input_mode == "r" ]]
+then
+    echo -e "Average\tMedian"
+    cat $results_filename
+else
+    echo "Averages:"
+    cut -f 1 $results_filename | tr "\n" "\t"
+    echo
+    echo "Medians:"
+    cut -f 2 $results_filename | tr "\n" "\t"
+    echo
+fi
+
+remove_tmp_files
+exit 0
+

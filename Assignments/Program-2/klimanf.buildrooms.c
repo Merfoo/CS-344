@@ -207,7 +207,6 @@ int main()
             roomA = &rooms[rand() % START_ROOM_COUNT];
         } while(!roomCanConnect(roomA));
 
-
         // Choose random room B that can have connection to A
         do {
             roomB = &rooms[rand() % START_ROOM_COUNT];

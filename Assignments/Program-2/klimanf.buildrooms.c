@@ -6,17 +6,22 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+// Room related constants
 #define MAX_ROOM_NAMES 10
 #define MAX_ROOM_CONNECTIONS 6
 #define MIN_ROOM_CONNECTIONS 3
 #define START_ROOM_COUNT 7
+
+// Filename and directory related constants
+#define MAX_DIR_NAME_SIZE 50
+#define MAX_FILENAME_SIZE 100
 
 // Struct object for a room
 typedef struct
 {
     int id;
     int connectionCount;
-    int connections[MAX_ROOM_CONNECTIONS];
+    int connectedRoomIds[MAX_ROOM_CONNECTIONS];
     char* name;
     char* roomType;
 } Room;
@@ -25,7 +30,7 @@ typedef struct
 void createRoomFiles(Room* rooms)
 {
     // Create directory to hold the room files
-    char dirName[50];
+    char dirName[MAX_DIR_NAME_SIZE];
     sprintf(dirName, "klimanf.rooms.%d", getpid());
     mkdir(dirName, 0755);
 
@@ -37,8 +42,8 @@ void createRoomFiles(Room* rooms)
         Room* room = &rooms[i];
         
         // Concatenate dirname and filename for filename
-        char filename[100];
-        sprintf(filename, "%s/%s", dirName,  room->name);
+        char filename[MAX_FILENAME_SIZE];
+        sprintf(filename, "%s/room_%s", dirName,  room->name);
         
         // Pointer to file for writing room data to
         FILE *fp;
@@ -51,11 +56,12 @@ void createRoomFiles(Room* rooms)
         int j;
 
         for(j = 0; j < room->connectionCount; j++)
-            fprintf(fp, "CONNECTION %d: %s\n", j + 1, rooms[room->connections[j]].name);
+            fprintf(fp, "CONNECTION %d: %s\n", j + 1, rooms[room->connectedRoomIds[j]].name);
 
         // Write the room type
         fprintf(fp, "ROOM TYPE: %s\n", room->roomType);
-        
+
+        // Close the newly created room file 
         fclose(fp);
     }
 }
@@ -81,7 +87,7 @@ int roomsConnected(Room* roomA, Room* roomB)
     int i;
 
     for(i = 0; i < roomA->connectionCount; i++)
-        if(roomA->connections[i] == roomB->id)
+        if(roomA->connectedRoomIds[i] == roomB->id)
             return 1;
 
     return 0;
@@ -103,8 +109,8 @@ int sameRooms(Room* roomA, Room* roomB)
 // Also incrememnts roomA and roomB connections count by 1
 void connectRooms(Room* roomA, Room* roomB)
 {
-    roomA->connections[roomA->connectionCount] = roomB->id;
-    roomB->connections[roomB->connectionCount] = roomA->id;
+    roomA->connectedRoomIds[roomA->connectionCount] = roomB->id;
+    roomB->connectedRoomIds[roomB->connectionCount] = roomA->id;
     roomA->connectionCount++;
     roomB->connectionCount++;
 }

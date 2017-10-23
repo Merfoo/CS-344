@@ -270,12 +270,6 @@ Room* getRoomByName(Room* rooms, char* name)
     return NULL;
 }
 
-// Display the promprt asking for what room to enter
-void displayRoomPrompt()
-{
-    printf("WHERE TO? >");
-}
-
 // Displays the current location which is the room passed in
 // and displays all connected room names of the passed in room
 void displayCurrentRoom(Room* curRoom)
@@ -358,11 +352,10 @@ void* saveTimeToFile(void* arg)
     return 0;
 }
 
-char* getRoomNameFromUser()
+// Gets a line of text from the user
+// the caller will have to free the result
+char* getUserInput()
 {
-    // Display prompt asking for the user to enter the new room
-    displayRoomPrompt();
-        
     // Buffer size and variable to hold input data from the user
     size_t bufSize = 0;
     char* lineRead = NULL;
@@ -430,7 +423,8 @@ void play(Room* rooms)
         while(1)
         {
             // Get the room name from the user
-            roomName = getRoomNameFromUser();
+            printf("WHERE TO? >");
+            roomName = getUserInput();
 
             // If room name is "time" the user wants the current time displayed
             if(strcmp(roomName, "time") == 0)
@@ -468,7 +462,7 @@ void play(Room* rooms)
             printf("\nHUH? I DON'T UNDERSTAND THAT ROOM. TRY AGAIN.\n\n");
         }
 
-        // Free the variable allocated by getRoomNameFromUser()
+        // Free the variable allocated by getUserInput()
         free(roomName);
     }
 
@@ -488,6 +482,10 @@ void play(Room* rooms)
     // Unlock the exit mutex to signal the end of the program and wait for it to exit
     pthread_mutex_unlock(&timeFileArg.exitMutex);
     pthread_join(writeTimeThreadId, NULL);
+
+    // Destroy the mutexes
+    pthread_mutex_destroy(&timeFileArg.mutex);
+    pthread_mutex_destroy(&timeFileArg.exitMutex);
 }
 
 // Entry point for program

@@ -15,8 +15,8 @@
 #define START_ROOM_COUNT 7
 
 // History related constants
-#define INITIAL_HISTORY_CAPACITY 2
-#define HISTORY_CAPACITY_MULTIPLIER 8
+#define HISTORY_INITIAL_CAPACITY 8
+#define HISTORY_CAPACITY_MULTIPLIER 2
 
 // Filename/Directory related constants
 #define MAX_DIR_NAME_SIZE 50
@@ -83,7 +83,7 @@ void addToRoomHistory(RoomHistory* history, int roomId)
 void initializeRoomHistory(RoomHistory* history)
 {
     history->count = 0;
-    history->capacity = INITIAL_HISTORY_CAPACITY;
+    history->capacity = HISTORY_INITIAL_CAPACITY;
     history->history = malloc(history->capacity * sizeof(int));
 }
 

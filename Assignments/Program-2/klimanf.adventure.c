@@ -3,6 +3,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -14,11 +16,14 @@
 
 // History related constants
 #define INITIAL_HISTORY_CAPACITY 2
-#define HISTORY_CAPACITY_MULTIPLIER 2
+#define HISTORY_CAPACITY_MULTIPLIER 8
 
 // Filename/Directory related constants
 #define MAX_DIR_NAME_SIZE 50
 #define MAX_ROOM_FILEPATH_SIZE 100
+
+// Time related constants
+#define MAX_TIME_BUFFER_SIZE 50
 
 // Struct object for path history
 typedef struct
@@ -37,6 +42,16 @@ typedef struct
     char name[MAX_ROOM_NAME_SIZE];
     char roomType[MAX_ROOM_TYPE_SIZE];
 } Room;
+
+// Struct for passing filename and mutex thread
+// responsible for writing the current time to 
+// the specified file
+typedef struct
+{
+    char* filename;
+    pthread_mutex_t mutex;
+    pthread_mutex_t exitMutex;
+} TimeFileArg;
 
 // Adds a room id entry to the room history object
 void addToRoomHistory(RoomHistory* history, int roomId)
@@ -101,11 +116,11 @@ void getNewestDirName(char* dirName)
 
                 // Check modification date of current dir with 
                 // current newest dir date
-                if((int)dirAttr.st_mtime > newestDirTime)
+                if((int) dirAttr.st_mtime > newestDirTime)
                 {
                     // Updates newest date if current dir is higher 
                     // and copies over dir name
-                    newestDirTime = (int)dirAttr.st_mtime;
+                    newestDirTime = (int) dirAttr.st_mtime;
                     strcpy(dirName, dirEntry->d_name);
                 }
             }
@@ -284,6 +299,82 @@ void displayCurrentRoom(Room* curRoom)
     }
 }
 
+// Get the current time from a file
+char* getTimeFromFile(TimeFileArg* timeFileArg)
+{
+    // Lock the mutex to be begin reading from the file
+    pthread_mutex_lock(&timeFileArg->mutex);
+
+    // Open the time file and read the first line from it
+    FILE* fp = fopen(timeFileArg->filename, "r");
+    size_t bufSize = 0;
+    char* lineRead = NULL;
+    getline(&lineRead, &bufSize, fp);
+    fclose(fp);
+    
+    // Get rid of the newline
+    lineRead[strlen(lineRead) - 1] = '\0';
+
+    // Unlock the mutext since we're done reading from the file
+    pthread_mutex_unlock(&timeFileArg->mutex);
+    
+    // Return the current time
+    return lineRead;
+}
+
+// Save the current time to a file
+void* saveTimeToFile(void* arg)
+{
+    // Convert the arg to TimeFileArg*
+    TimeFileArg* timeFileArg = (TimeFileArg*) arg;
+    
+    // Keep writing the time as long as the exitMutex is locked
+    // by the main thread
+    while(pthread_mutex_trylock(&timeFileArg->exitMutex) != 0)
+    {
+        // Lock the mutex to begin writing to the file
+        pthread_mutex_lock(&timeFileArg->mutex);
+
+        // Get the current time
+        time_t rawTime;
+        time(&rawTime);
+        struct tm* timeInfo= localtime(&rawTime);
+        char timeBuffer[MAX_TIME_BUFFER_SIZE];
+    
+        // Convert the time to specified format
+        // 1:03pm, Tuesday, September 13, 2016
+        strftime(timeBuffer, MAX_TIME_BUFFER_SIZE, "%I:%M%p, %A, %B %d, %Y", timeInfo);
+   
+        // Open/Create the time file and write the current date to it
+        FILE* fp = fopen(timeFileArg->filename, "w");
+        fprintf(fp, "%s\n", timeBuffer);
+        fclose(fp);
+    
+        // Unlock the mutext since we're done writing the time to the file
+        pthread_mutex_unlock(&timeFileArg->mutex);
+        sleep(1);
+    }
+
+    return 0;
+}
+
+char* getRoomNameFromUser()
+{
+    // Display prompt asking for the user to enter the new room
+    displayRoomPrompt();
+        
+    // Buffer size and variable to hold input data from the user
+    size_t bufSize = 0;
+    char* lineRead = NULL;
+
+    // Get user input and remove the newline from it
+    getline(&lineRead, &bufSize, stdin);
+    lineRead[strlen(lineRead) - 1] = '\0';
+
+    // Return user input
+    return lineRead;
+}
+
 // Plays the adventure game
 void play(Room* rooms)
 {
@@ -310,30 +401,63 @@ void play(Room* rooms)
             endRoom = &rooms[i];
     }
 
+    // TimeFileArg struct for creating/writing/reading
+    // from a time file, includes filename and mutex
+    // to ensure only one thread is accessing the file
+    TimeFileArg timeFileArg = { 
+        "currentTime.txt", // Filename for time to be written/read from
+        PTHREAD_MUTEX_INITIALIZER, // Mutex for file stuff
+        PTHREAD_MUTEX_INITIALIZER, // Mutex for keeping write time thread alive
+    };
+
+    // Lock the exit mutex to keep write time thread alive
+    pthread_mutex_lock(&timeFileArg.exitMutex);
+
+    // Write the current time to a file in a separate thread
+    pthread_t writeTimeThreadId = NULL;
+    pthread_create(&writeTimeThreadId, NULL, saveTimeToFile, (void*) &timeFileArg);
+
     // Keep looping as long as the current room is not the same as the end room
     while(curRoom->id != endRoom->id)
     {
         // Display information about current location and room
         displayCurrentRoom(curRoom);
 
-        // Display prompt asking for the user to enter the new room
-        displayRoomPrompt();
-        
-        // Buffer size and variable to hold input data from the user
-        size_t bufSize = 0;
-        char* lineRead = NULL;
+        // Room name from user
+        char* roomName;
 
-        // Get user input and remove the newline from it
-        getline(&lineRead, &bufSize, stdin);
-        lineRead[strlen(lineRead) - 1] = '\0';
+        // Display the current time if the user types in "time"
+        while(1)
+        {
+            // Get the room name from the user
+            roomName = getRoomNameFromUser();
+
+            // If room name is "time" the user wants the current time displayed
+            if(strcmp(roomName, "time") == 0)
+            {
+                // Read the current time from the file
+                char* currentTime = getTimeFromFile(&timeFileArg);
+                
+                // Display the current time
+                printf("\n%s\n\n", currentTime);
+
+                // Free the char* that was allocated from reading the current time
+                // and from reading input from the user
+                free(currentTime);
+                free(roomName);
+            }
+
+            else
+                break;
+        }
 
         // Check if the room name from the user is a valid room
         // connected to the current room
-        if(isConnectedRoomName(curRoom, lineRead))
+        if(isConnectedRoomName(curRoom, roomName))
         {
             // Get the room object with the name passed in by the user
             // and add its room id to the room history
-            curRoom = getRoomByName(rooms, lineRead);
+            curRoom = getRoomByName(rooms, roomName);
             addToRoomHistory(history, curRoom->id);
         }
 
@@ -344,8 +468,8 @@ void play(Room* rooms)
             printf("\nHUH? I DON'T UNDERSTAND THAT ROOM. TRY AGAIN.\n\n");
         }
 
-        // Free the variable allocated by getline
-        free(lineRead);
+        // Free the variable allocated by getRoomNameFromUser()
+        free(roomName);
     }
 
     // Display outro message and the number of steps it took to get to the
@@ -360,6 +484,10 @@ void play(Room* rooms)
     // Free up the history object to not have memory leaks!
     free(history->history);
     free(history);
+
+    // Unlock the exit mutex to signal the end of the program and wait for it to exit
+    pthread_mutex_unlock(&timeFileArg.exitMutex);
+    pthread_join(writeTimeThreadId, NULL);
 }
 
 // Entry point for program

@@ -337,7 +337,7 @@ void* saveTimeToFile(void* arg)
     
         // Convert the time to specified format
         // 1:03pm, Tuesday, September 13, 2016
-        strftime(timeBuffer, MAX_TIME_BUFFER_SIZE, "%I:%M%p, %A, %B %d, %Y", timeInfo);
+        strftime(timeBuffer, MAX_TIME_BUFFER_SIZE, "%l:%M%P, %A, %B %d, %Y", timeInfo);
    
         // Open/Create the time file and write the current date to it
         FILE* fp = fopen(timeFileArg->filename, "w");

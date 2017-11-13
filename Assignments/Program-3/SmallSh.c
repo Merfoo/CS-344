@@ -25,24 +25,51 @@ int executeCommand(Command* cmd)
     if(childPid == 0)
     {
         // Input/Output file descriptors if needed
-        int iFd = -1;
-        int oFd = -1;
+        int inputFd = -1;
+        int outputFd = -1;
 
         // Create input file if required
         if(cmd->inputFile)
         {
-            iFd = open(cmd->inputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+            inputFd = open(cmd->inputFile, O_RDONLY);
            
-            printf("Am I dumb: %s\n", cmd->inputFile);
- 
-            if(iFd == -1)
+            if(inputFd == -1)
             {
                 perror("Error: ");
                 exit(1);
             }
 
             // Set stdin to point to the input file
-            dup2(iFd, 0);
+            dup2(inputFd, 0);
+        }
+
+        // Otherwise if its a background process, point stdin to /dev/null
+        else if(cmd->foreground == false)
+        {
+            int nullInput = open("/dev/null", O_RDONLY);
+            dup2(nullInput, 0);
+        }
+
+        // Create output file if required
+        if(cmd->outputFile)
+        {
+            outputFd = open(cmd->outputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+            
+            if(outputFd == -1)
+            {
+                perror("Error: ");
+                exit(1);
+            }
+
+            // Set stdout to point to the output file
+            dup2(outputFd, 1);
+        }
+
+        // Otherwise if its a background process, point stdout to /dev/null
+        else if(cmd->foreground == false)
+        {
+            int nullOutput = open("/dev/null", O_WRONLY);
+            dup2(nullOutput, 1);
         }
 
         if(execvp(cmd->cmd, cmd->args) < 0)
@@ -116,14 +143,10 @@ int main()
         Command cmd;
         parseCommand(input, &cmd);
         free(input);
-        //printCommand(&cmd);
 
         // Check if the command is empty or begins/is a comment, if so do nothing
         if(cmd.cmd == NULL || cmd.cmd[0] == '#')
-        {
-            printf("NOTHING DONE\n");
             continue;
-        }
  
         // Check if the command is one of our built-ins
         if(strcmp(cmd.cmd, CMD_EXIT) == 0)
@@ -138,13 +161,18 @@ int main()
         // Run the command in a new process
         else
         {
-            printf("Running command in a new process!\n");
             fflush(stdout);
             pid_t childPid = executeCommand(&cmd);
 
             // If its a background process, add the child pid to array of background processes
             if(cmd.foreground == 0)
+            {
                 addToVectorInt(&bgProcesses, childPid);
+
+                // Display the background process info
+                printf("background pid is %d\n", childPid);
+                fflush(stdout);
+            }
 
             // Else its a foreground process, so wait for it
             else

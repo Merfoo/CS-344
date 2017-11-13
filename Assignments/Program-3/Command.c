@@ -30,6 +30,11 @@ void parseCommand(char* input, Command* cmd)
         // If its the first token, this token is the command and first argument
         if(cmd->argCount == 0)
         {
+            // If the beginning of the first token is a '#', then this input is a comment
+            // thus, there will be no command
+            if(token[0] == '#')
+                break;
+
             cmd->cmd = token;
             cmd->args[cmd->argCount] = token;
             cmd->argCount++;

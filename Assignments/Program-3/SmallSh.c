@@ -1,4 +1,9 @@
+// GCC has bug for things being initialized to {0} in c99, so ignore those warnings
+#pragma GCC diagnostic ignored "-Wmissing-braces"
+
+// This is so that getline works with c99
 #define _GNU_SOURCE
+
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -7,6 +12,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <signal.h>
 #include "SmallSh.h"
 #include "Command.h"
 #include "BuiltInCommands.h"
@@ -145,10 +151,20 @@ int executeCommand(Command* cmd)
             dup2(outputFd, 1);
         }
 
-        // If its a background process, set its stdin/stdout to null if 
-        // file redirections aren't set
-        if(cmd->foreground == false)
+        // If its a foreground process we need to set the SIGINT signal handler
+        // back to the default
+        if(cmd->foreground)
         {
+            struct sigaction defaultAction = {0};
+            defaultAction.sa_handler = SIG_DFL;
+            sigaction(SIGINT, &defaultAction, NULL);
+        }
+
+        // Else its a background process, set its stdin/stdout to null if 
+        // file redirections aren't set
+        else
+        {
+            // Redirect stdin/stout if not set
             if(cmd->inputFile == NULL)
             {
                 int nullInput = open("/dev/null", O_RDONLY);
@@ -175,12 +191,12 @@ int executeCommand(Command* cmd)
 }
 
 // Checks if any background processes ended
-void checkBackgroundProcesses(VectorInt* bgProcesses)
+void checkBackgroundProcesses()
 {
     // Loop over each pid checking if it has been terminated
-    for(int i = 0; i < bgProcesses->size; i++)
+    for(int i = 0; i < bgProcesses.size; i++)
     {
-        pid_t pid = bgProcesses->array[i];
+        pid_t pid = bgProcesses.array[i];
         int exitMethod;
 
         // If the pid has been terminated, waitpid returns != 0
@@ -198,21 +214,59 @@ void checkBackgroundProcesses(VectorInt* bgProcesses)
             fflush(stdout);
 
             // Remove the pid from the array by replacing it with the last pid in the array
-            bgProcesses->array[i] = bgProcesses->array[bgProcesses->size - 1];
-            bgProcesses->size--;
+            bgProcesses.array[i] = bgProcesses.array[bgProcesses.size - 1];
+            bgProcesses.size--;
             i--;
         }
     }
 }
 
+// Flip foreground mode when the CTRL-Z command is sent
+void flipForegroundMode(int sig)
+{
+    // Declare msg related, and flip foregroundMode
+    char* msg;
+    int msgSize;
+    foregroundMode = !foregroundMode;
+    
+    // Display message depending on foreground mode
+    if(foregroundMode)
+    {
+        msg = "\nEntering foreground-only mode (& is now ignored)\n";
+        msgSize = 50;
+    }
+
+    else
+    {
+        msg = "\nExiting foreground-only mode\n";
+        msgSize = 30;
+    }
+
+    write(STDOUT_FILENO, msg, msgSize);
+}
+
 int main()
 {
+    // Init foregroundMode to false
+    foregroundMode = false;
+
+    // Ignore the SIGINT signal
+    struct sigaction ignore_action = {0};
+    ignore_action.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &ignore_action, NULL);
+
+    // Attach handler for CTRL-Z SIGTSTP to flip foreground mode
+    struct sigaction foregroundModeAction = {0};    
+    foregroundModeAction.sa_handler = flipForegroundMode;
+    sigfillset(&foregroundModeAction.sa_mask);
+    foregroundModeAction.sa_flags = 0;
+    sigaction(SIGTSTP, &foregroundModeAction, NULL);
+
     // Init last exit status/terminate signal
-    lastExitStatus = -1;
-    lastTermSignal = -1;
+    lastExitStatus = 0;
+    lastTermSignal = 0;
 
     // Create array to store background processes
-    VectorInt bgProcesses;
     initVectorInt(&bgProcesses);
 
     // This processes pid for replacing $$ with the process id later on
@@ -223,16 +277,31 @@ int main()
     while(true)
     {
         // Check if any background process terminated
-        checkBackgroundProcesses(&bgProcesses);
-
-        // Display prompt
-        printf(": ");
-        fflush(stdout);
+        checkBackgroundProcesses();
 
         // Get user input for the next command
         char* input = NULL;
         size_t bufSize = 0; 
-        getline(&input, &bufSize, stdin);
+
+        // Loop till we get valid input
+        while(true)
+        {
+            // Display prompt
+            printf(": ");
+            fflush(stdout);
+
+            // Get how many bytes read, -1 means we got interrupted
+            // thus need to ask again, otherwise its valid and we 
+            // can exit the loop
+            int bytesRead = getline(&input, &bufSize, stdin);
+            
+            if(bytesRead == -1)
+                clearerr(stdin);
+
+            else
+                break;
+        }        
+
         input[strlen(input) - 1] = '\0';
 
         // Expand "$$" to this processes pid
@@ -250,7 +319,7 @@ int main()
  
         // Check if the command is one of our built-ins
         if(strcmp(cmd.cmd, CMD_EXIT) == 0)
-            cmdExit();
+            cmdExit(&bgProcesses);
 
         else if(strcmp(cmd.cmd, CMD_CD) == 0)
             cmdCd(cmd.args[1]);
@@ -261,11 +330,15 @@ int main()
         // Run the command in a new process
         else
         {
+            // Make the process foreground if we're in foreground only mode
+            if(foregroundMode)
+                cmd.foreground = true;
+
             // Run the command
             pid_t childPid = executeCommand(&cmd);
 
             // If its a background process, add the child pid to array of background processes
-            if(cmd.foreground == 0)
+            if(cmd.foreground == false)
             {
                 addToVectorInt(&bgProcesses, childPid);
 
@@ -291,7 +364,11 @@ int main()
 
                 // Else signal terminated it
                 else
+                {
                     lastTermSignal = WTERMSIG(exitMethod);
+                    printf("terminated by signal %d\n", lastTermSignal);
+                    fflush(stdout);
+                }
             }
         }
     }

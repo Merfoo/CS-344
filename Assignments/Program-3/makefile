@@ -1,5 +1,5 @@
 CXX = gcc
-CXXFLAGS = -std=c99 -Wall -pedantic-errors
+CXXFLAGS = -std=c99 -Wall
 
 EXE = smallsh
 

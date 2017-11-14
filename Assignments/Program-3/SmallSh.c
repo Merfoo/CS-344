@@ -28,13 +28,12 @@ char* replaceStr(char* source, char* target, char* substitute)
     int substituteSize = strlen(substitute);
     int newStrSize = 0;
         
-    // Create array that wil contain indices of the source to copy to
-    // the new one
-    int* sourceIndices = malloc((sourceSize * sizeof(int)) * 2);
-    int indicesCount = 0;
+    // Create array that wil contain indexes of where the target string
+    // was found
+    int* targetIndexes = malloc(sourceSize * sizeof(int));
+    int targetsFound = 0;
 
-    // Loop over the source, add the start/end index to sourceIndices, 
-    // or -1 if the substring was found
+    // Loop over the source, add the indexes of where the target string was found
     int begIndex = 0;
 
     while(begIndex < sourceSize)
@@ -42,70 +41,64 @@ char* replaceStr(char* source, char* target, char* substitute)
         // Find index of target string in source string
         char* substr = strstr(&source[begIndex], target);
 
-        // If a substring is found we need to add the indices of the substring of
-        // the source before the substring and add -1 to the indicies indicate that
-        // the substitute string should be added
+        // If the target string is found we need to add the index of where
+        // in the source string it was found
         if(substr)
         {
             // Calculate start index of substring
             int substrIndex = substr - source;
-           
-            // If the substring index is farther than our current index
-            // we need to add the substring from our current index
-            // to the index of the substring 
-            if(substrIndex != begIndex)
-            {
-                newStrSize += substrIndex - begIndex;
-                sourceIndices[indicesCount++] = begIndex;
-                sourceIndices[indicesCount++] = substrIndex;
-            }
+            
+            // Add the index of where the target string was found
+            targetIndexes[targetsFound++] = substrIndex;
 
-            // Add -1 to indicate that the substitute string should be added            
-            sourceIndices[indicesCount++] = -1;
-            newStrSize += substituteSize;
+            // Add the size of the substring before the target and the 
+            // target size to the new string size and update the 
+            // starting point
+            newStrSize += (substrIndex - begIndex) + substituteSize;
             begIndex = substrIndex + targetSize;
         }
 
-        // Else, no more substrings were found, so add the substring from the
-        // current index to the end of the string to the indices
+        // Else, no more substrings were found
         else
         {
             newStrSize += sourceSize - begIndex;
-            sourceIndices[indicesCount++] = begIndex;
-            sourceIndices[indicesCount++] = sourceSize;
             break;  
         }
     }
 
     // Begin creating the new string to contain the replaced substrings,
     // plus one more for null
-    char* newStr = malloc((newStrSize * sizeof(char)) + 1);
+    char* newStr = malloc((newStrSize + 1) * sizeof(char));
     int newStrIndex = 0;
+    int targetIndex = 0;
 
-    // Loop over each indice
-    for(int i = 0; i < indicesCount; i++)
+    // Loop over the source string copying it into the new string, inserting
+    // the substitute string when a target index is reached
+    for(int i = 0; i < sourceSize; i++)
     {
-        // If -1, add the substitute string
-        if(sourceIndices[i] == -1)
+        // If the target was found at the current index, insert it into the
+        // new string
+        if(targetIndex < targetsFound && targetIndexes[targetIndex] == i)
         {
+            // Copy over the substitute string into new string
             strncpy(&newStr[newStrIndex], substitute, substituteSize);
+
+            // Increment the new string index substitute size and the
+            // source index by the target size
             newStrIndex += substituteSize;
+            i += targetSize - 1;
+            
+            // Increment target index
+            targetIndex++;
         }
 
-        // Else, add the substring from the beg index sourceIndices[i]
-        // to the end index sourceIndices[i + 1]
+        // Else just copy the source string
         else
-        {
-            int copySize = sourceIndices[i + 1] - sourceIndices[i];
-            strncpy(&newStr[newStrIndex], &source[sourceIndices[i]], copySize);
-            newStrIndex += copySize;
-            i++;
-        }
+            newStr[newStrIndex++] = source[i];
     }
 
     // Add the null character at last spot
     newStr[newStrSize] = '\0';
-
     return newStr;
 }
 
@@ -224,7 +217,7 @@ void checkBackgroundProcesses()
 // Flip foreground mode when the CTRL-Z command is sent
 void flipForegroundMode(int sig)
 {
-    // Declare msg related, and flip foregroundMode
+    // Declare msg and size of msg, and flip foregroundMode
     char* msg;
     int msgSize;
     foregroundMode = !foregroundMode;

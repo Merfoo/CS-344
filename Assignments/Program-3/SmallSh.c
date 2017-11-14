@@ -71,7 +71,8 @@ char* replaceStr(char* source, char* target, char* substitute)
         }
     }
 
-    // Begin creating the new string to contain the replaced substrings
+    // Begin creating the new string to contain the replaced substrings,
+    // plus one more for null
     char* newStr = malloc((newStrSize * sizeof(char)) + 1);
     int newStrIndex = 0;
 
@@ -96,6 +97,9 @@ char* replaceStr(char* source, char* target, char* substitute)
         }
     }
 
+    // Add the null character at last spot
+    newStr[newStrSize] = '\0';
+
     return newStr;
 }
 
@@ -111,14 +115,10 @@ int executeCommand(Command* cmd)
     // If childPID is 0, we're the child process
     if(childPid == 0)
     {
-        // Input/Output file descriptors if needed
-        int inputFd = -1;
-        int outputFd = -1;
-
         // Create input file if required
         if(cmd->inputFile)
         {
-            inputFd = open(cmd->inputFile, O_RDONLY);
+            int inputFd = open(cmd->inputFile, O_RDONLY);
            
             if(inputFd == -1)
             {
@@ -130,17 +130,10 @@ int executeCommand(Command* cmd)
             dup2(inputFd, 0);
         }
 
-        // Otherwise if its a background process, point stdin to /dev/null
-        else if(cmd->foreground == false)
-        {
-            int nullInput = open("/dev/null", O_RDONLY);
-            dup2(nullInput, 0);
-        }
-
         // Create output file if required
         if(cmd->outputFile)
         {
-            outputFd = open(cmd->outputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+            int outputFd = open(cmd->outputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
             
             if(outputFd == -1)
             {
@@ -152,13 +145,24 @@ int executeCommand(Command* cmd)
             dup2(outputFd, 1);
         }
 
-        // Otherwise if its a background process, point stdout to /dev/null
-        else if(cmd->foreground == false)
+        // If its a background process, set its stdin/stdout to null if 
+        // file redirections aren't set
+        if(cmd->foreground == false)
         {
-            int nullOutput = open("/dev/null", O_WRONLY);
-            dup2(nullOutput, 1);
+            if(cmd->inputFile == NULL)
+            {
+                int nullInput = open("/dev/null", O_RDONLY);
+                dup2(nullInput, 0);   
+            }
+
+            if(cmd->outputFile == NULL)
+            {
+                int nullOutput = open("/dev/null", O_WRONLY);
+                dup2(nullOutput, 1);
+            }
         }
 
+        // Replace the current process with the wanted command
         if(execvp(cmd->cmd, cmd->args) < 0)
         {
             perror("Error: ");

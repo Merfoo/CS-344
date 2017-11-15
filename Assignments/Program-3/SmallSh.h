@@ -12,9 +12,6 @@ VectorInt bgProcesses;
 // target substring with the replacement substring
 char* replaceStr(char* source, char* target, char* substitute);
 
-// Executes a command from a command struct
-int executeCommand(Command* cmd);
-
 // Checks if any of the background processes has ended
 void checkBackgroundProcesses();
 
@@ -23,4 +20,3 @@ void flipForegroundMode(int sig);
 
 // Entry point of smallsh
 int main();
-

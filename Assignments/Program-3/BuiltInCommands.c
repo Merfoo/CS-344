@@ -46,4 +46,3 @@ void cmdStatus()
     else
         printf("terminated by signal %d\n", lastTermSignal);
 }
-

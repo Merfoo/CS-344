@@ -1,6 +1,17 @@
+// GCC has bug for things being initialized to {0} in c99, so ignore those warnings
+#pragma GCC diagnostic ignored "-Wmissing-braces"
+
+// To make some of the functions work in c99
+#define _GNU_SOURCE
+
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <signal.h>
 #include "Command.h"
 
 // Parses an input string into a Command object
@@ -89,19 +100,83 @@ void parseCommand(char* input, Command* cmd)
     cmd->args[cmd->argCount] = '\0';
 }
 
-// Prints the contents of a Command object for debugging
-void printCommand(Command* cmd)
+// Run the command in a new process
+int executeCommand(Command* cmd)
 {
-    printf("Command: %s\n", cmd->cmd);
-    printf("Args:\n");
+    // PID of the child
+    pid_t childPid = -1;
 
-    for(int i = 0; i < cmd->argCount; i++)
+    // Fork a new process
+    childPid = fork();    
+
+    // If childPID is 0, we're the child process
+    if(childPid == 0)
     {
-        printf("\t%s\n", cmd->args[i]);
+        // Create input file if required
+        if(cmd->inputFile)
+        {
+            int inputFd = open(cmd->inputFile, O_RDONLY);
+           
+            if(inputFd == -1)
+            {
+                perror(cmd->inputFile);
+                exit(1);
+            }
+
+            // Set stdin to point to the input file
+            dup2(inputFd, 0);
+        }
+
+        // Create output file if required
+        if(cmd->outputFile)
+        {
+            int outputFd = open(cmd->outputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+            
+            if(outputFd == -1)
+            {
+                perror(cmd->outputFile);
+                exit(1);
+            }
+
+            // Set stdout to point to the output file
+            dup2(outputFd, 1);
+        }
+
+        // If its a foreground process we need to set the SIGINT signal handler
+        // back to the default
+        if(cmd->foreground)
+        {
+            struct sigaction defaultAction = {0};
+            defaultAction.sa_handler = SIG_DFL;
+            sigaction(SIGINT, &defaultAction, NULL);
+        }
+
+        // Else its a background process, set its stdin/stdout to null if 
+        // file redirections aren't set
+        else
+        {
+            // Redirect stdin/stout if not set
+            if(cmd->inputFile == NULL)
+            {
+                int nullInput = open("/dev/null", O_RDONLY);
+                dup2(nullInput, 0);   
+            }
+
+            if(cmd->outputFile == NULL)
+            {
+                int nullOutput = open("/dev/null", O_WRONLY);
+                dup2(nullOutput, 1);
+            }
+        }
+
+        // Replace the current process with the wanted command
+        if(execvp(cmd->cmd, cmd->args) < 0)
+        {
+            perror(cmd->cmd);
+            exit(1);
+        }
     }
 
-    printf("InputFile: %s\n", cmd->inputFile);
-    printf("OutputFile: %s\n", cmd->outputFile);
-    printf("Foreground: %d\n", cmd->foreground);
+    // Otherwise we're the parent
+    return childPid;
 }
-

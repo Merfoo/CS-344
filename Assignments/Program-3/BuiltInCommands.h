@@ -2,6 +2,7 @@
 
 #include "VectorInt.h"
 
+// The built-in commands strings
 #define CMD_EXIT "exit"
 #define CMD_CD "cd"
 #define CMD_STATUS "status"
@@ -18,4 +19,3 @@ void cmdCd(char* path);
 
 // Displays last commands exist status/terminate signal
 extern void cmdStatus();
-

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include "VectorInt.h"
 
+// Inits the vector object
 void initVectorInt(VectorInt* vec)
 {
     vec->capacity = 4;
@@ -8,6 +9,7 @@ void initVectorInt(VectorInt* vec)
     vec->array = malloc(vec->capacity * sizeof(int));
 }
 
+// Adds an int to a vector, increasing size if neccessary
 void addToVectorInt(VectorInt* vec, int val)
 {
     // Double the array capacity if the size is >= to capacity
@@ -29,4 +31,3 @@ void addToVectorInt(VectorInt* vec, int val)
     vec->array[vec->size] = val;
     vec->size++;
 }
-

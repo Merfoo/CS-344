@@ -13,4 +13,3 @@ void initVectorInt(VectorInt* vec);
 
 // Adds to vector
 void addToVectorInt(VectorInt* vec, int val);
-

@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+// Max input length and command args for a Command
 #define MAX_INPUT_LENGTH 2049
 #define MAX_COMMAND_ARGS 514
 
@@ -33,6 +34,5 @@ typedef struct
 // Parses an input string into a Command object
 void parseCommand(char* input, Command* cmd);
 
-// Prints the content of a Commnd object for debugging purposes
-void printCommand(Command* cmd);
-
+// Executes the command in a new process, returns the process id
+int executeCommand(Command* cmd);

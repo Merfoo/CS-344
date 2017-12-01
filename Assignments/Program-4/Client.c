@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+// Gets the content from a file and sets the length to the variable passed in
 char* getFileContent(char* filename, int* length)
 {
     // Open the file for reading
@@ -38,10 +39,13 @@ char* getFileContent(char* filename, int* length)
 // Returns 0 otherwise
 int validFileContent(char* string, int length)
 {
+    // Loop over each character checking if its not a space or
+    // not within A-Z
     for(int i = 0; i < length; i++)
         if(string[i] != ' ' && (string[i] < 'A' || string[i] > 'Z'))
             return 0;
 
+    // Return 1 for being a valid file content
     return 1;
 }
 

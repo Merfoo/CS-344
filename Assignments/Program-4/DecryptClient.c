@@ -1,4 +1,3 @@
-
 // So that getline works with c99
 #define _GNU_SOURCE
 

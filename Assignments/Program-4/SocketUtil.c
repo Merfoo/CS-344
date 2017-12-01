@@ -63,6 +63,8 @@ int recvData(int socketFd, char* buffer, int bufferSize)
     return 1;
 }
 
+// Creates a client socket on the port and fills in the serverAddr thats passed in
+// Returns the file descriptor for the newly created socket
 int createClientSocket(int port, struct sockaddr_in* serverAddr)
 {
     // Create server address
@@ -94,6 +96,8 @@ int createClientSocket(int port, struct sockaddr_in* serverAddr)
     return socketFd;
 }
 
+// Creates a server socket on the passed in port
+// Returns the file descriptor of the newly created socket
 int createServerSocket(int port)
 {
     // Create server socket address for connections on the same machine,
@@ -123,6 +127,10 @@ int createServerSocket(int port)
     return listenSocketFd;
 }
 
+// Sends a message about the type of client it is and receives a message if 
+// the connection got accepted
+// Returns 1 if accepted
+// Returns 0 otherwise
 int connectionAccepted(int socketFd, char* clientType)
 {
     sendData(socketFd, clientType, 1);
@@ -133,6 +141,10 @@ int connectionAccepted(int socketFd, char* clientType)
     return buffer[0] == 'Y';
 }
 
+// Receives message about the client type, comparing it against the
+// passed in accepted client. 
+// Returns 1 if they match
+// Returns 0 otherwise
 int connectionVerified(int socketFd, char acceptedClientType)
 {
     char buffer[1];
@@ -144,6 +156,7 @@ int connectionVerified(int socketFd, char acceptedClientType)
     return 1;
 }
 
+// Sends a message about the length of incoming data
 void sendMessageLength(int socketFd, int length)
 {
     char buffer[10];
@@ -151,6 +164,7 @@ void sendMessageLength(int socketFd, int length)
     sendData(socketFd, buffer, sizeof(buffer));
 }
 
+// Receives a message about the length of incoming data
 int recvMessageLength(int socketFd)
 {
     char buffer[10];

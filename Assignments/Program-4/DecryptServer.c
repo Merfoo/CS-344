@@ -1,4 +1,4 @@
-#include "EncryptServer.h"
+#include "DecryptServer.h"
 #include "SocketUtil.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,11 +11,11 @@
 
 #define MAX_CONCURRENT_CONNECTIONS 5
 
-// Return a string thats the encrypted version of the text
-char* encryptText(char* text, int textLength, char* key)
+// Return a string thats the decrypted version of the text
+char* decryptText(char* text, int textLength, char* key)
 {
-    // Create string for the encrypted text
-    char* encText = malloc((textLength + 1) * sizeof(char));
+    // Create string for the decrypted text
+    char* decText = malloc((textLength + 1) * sizeof(char));
 
     // Loop over each text character
     for(int i = 0; i < textLength; i++)
@@ -31,19 +31,30 @@ char* encryptText(char* text, int textLength, char* key)
 
         if(key[i] == ' ')
             keyChar = 26;
+        
+        // Get the difference between the text and the key
+        decText[i] = (textChar - keyChar);
+        
+        // Add 27 to the difference if its negative
+        if(decText[i] < 0)
+            decText[i] += 27;
 
-        // Add the text and key, modulo 27 it, and add 'A' to
-        // encrypt it
-        encText[i] = ((textChar + keyChar) % 27) + 'A';
+        // Convert character to space
+        if(decText[i] == 26)
+            decText[i] = ' ';
+
+        // Otherwise just add 'A' to get the character
+        else
+            decText[i] += 'A';
     }
 
     // Add the null terminating character and return the string
-    encText[textLength] = '\0';
-    return encText;
+    decText[textLength] = '\0';
+    return decText;
 }
 
-// Forks the process, receives the unecrypted text from the accepted socket
-// encrypts it, and returns it to the client
+// Forks the process, receives the encrypted text from the accepted socket
+// decrypts it, and returns it to the client
 int acceptConnection(int connectionFd)
 {
     // Fork the process
@@ -66,14 +77,14 @@ int acceptConnection(int connectionFd)
         recvData(connectionFd, key, keyLength);
         key[keyLength] = '\0';
 
-        // Encrypt the message and send it back
-        char* enc = encryptText(text, textLength, key);
-        sendData(connectionFd, enc, textLength);
-        
+        // Decrypt the message and send it back
+        char* dec = decryptText(text, textLength, key);
+        sendData(connectionFd, dec, textLength);
+
         // Free all the strings allocated for the data and exit
         free(text);
         free(key);
-        free(enc);
+        free(dec);
         exit(0);
     }
 
@@ -136,7 +147,7 @@ int main(int argc, char* argv[])
 
 
         // Only accept if its been verified and there aren't too many concurrent connections
-        if(connectionVerified(connectionFd, 'E') && activeConnections < 5)
+        if(connectionVerified(connectionFd, 'D') && activeConnections < 5)
         {
             int childPid = acceptConnection(connectionFd);
             connections[activeConnections++] = childPid;

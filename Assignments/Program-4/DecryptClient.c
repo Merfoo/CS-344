@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
     // Exit if the plaintext contains bad characters
     if(!validFileContent(text, textLength))
     {
-        fprintf(stderr, "otp_enc error: input contains bad characters\n");
+        fprintf(stderr, "otp_dec error: input contains bad characters\n");
         exit(1);
     }
 
@@ -62,9 +62,9 @@ int main(int argc, char* argv[])
 
     // If the connection got rejected by the server it means we connected
     // to the wrong server
-    if(!connectionAccepted(socketFd, "E"))
+    if(!connectionAccepted(socketFd, "D"))
     {
-        fprintf(stderr, "Error: could not contact otp_enc_d on port %d\n", port);
+        fprintf(stderr, "Error: could not contact otp_dec_d on port %d\n", port);
         exit(0);
     }
 

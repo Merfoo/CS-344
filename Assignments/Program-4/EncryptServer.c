@@ -34,7 +34,14 @@ char* encryptText(char* text, int textLength, char* key)
 
         // Add the text and key, modulo 27 it, and add 'A' to
         // encrypt it
-        encText[i] = ((textChar + keyChar) % 27) + 'A';
+        encText[i] = ((textChar + keyChar) % 27);
+
+        // Convert 26 to spaces, otherwise just add 'A'
+        if(encText[i] == 26)
+            encText[i] = ' ';
+
+        else
+            encText[i] += 'A';
     }
 
     // Add the null terminating character and return the string

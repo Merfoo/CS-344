@@ -2,7 +2,7 @@
 // So that getline works with c99
 #define _GNU_SOURCE
 
-#include "EncryptClient.h"
+#include "DecryptClient.h"
 #include "Client.h"
 #include "SocketUtil.h"
 #include <stdio.h>

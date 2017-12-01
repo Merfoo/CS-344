@@ -9,13 +9,13 @@ KEYGEN_OBJS = $(KEYGEN_SRCS:.c=.o)
 
 # otp_enc_d
 ENCD_EXE = otp_enc_d
-ENCD_HDRS = EncryptServer.h
+ENCD_HDRS = EncryptServer.h SocketUtil.h
 ENCD_SRCS = $(ENCD_HDRS:.h=.c)
 ENCD_OBJS = $(ENCD_SRCS:.c=.o)
 
 # otp_enc
 ENC_EXE = otp_enc
-ENC_HDRS = EncryptClient.h
+ENC_HDRS = EncryptClient.h SocketUtil.h
 ENC_SRCS = $(ENC_HDRS:.h=.c)
 ENC_OBJS = $(ENC_SRCS:.c=.o)
 

@@ -1,6 +1,3 @@
-// So that getline works with c99
-#define _GNU_SOURCE
-
 #include "EncryptClient.h"
 #include "Client.h"
 #include "SocketUtil.h"
@@ -37,7 +34,7 @@ int main(int argc, char* argv[])
     // Exit if the plaintext contains bad characters
     if(!validFileContent(text, textLength))
     {
-        fprintf(stderr, "otp_enc error: input contains bad characters\n");
+        fprintf(stderr, "otp_enc error: plaintext '%s' contains bad characters\n", textFilename);
         exit(1);
     }
 

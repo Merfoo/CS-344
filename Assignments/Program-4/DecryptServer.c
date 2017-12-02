@@ -145,9 +145,8 @@ int main(int argc, char* argv[])
             exit(1);
         }
 
-
         // Only accept if its been verified and there aren't too many concurrent connections
-        if(connectionVerified(connectionFd, 'D') && activeConnections < 5)
+        if(connectionVerified(connectionFd, 'D') && activeConnections < MAX_CONCURRENT_CONNECTIONS)
         {
             int childPid = acceptConnection(connectionFd);
             connections[activeConnections++] = childPid;
